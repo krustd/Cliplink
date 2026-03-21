@@ -27,6 +27,7 @@ import kotlin.concurrent.thread
 
 class MainActivity : ComponentActivity() {
     private lateinit var selectedDeviceText: TextView
+    private lateinit var scanStatusText: TextView
     private lateinit var scanButton: Button
     private lateinit var stopScanButton: Button
     private lateinit var manualNameInput: EditText
@@ -38,7 +39,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var deviceStore: DeviceStore
     private lateinit var nsdScanner: NsdScanner
-    private val subnetScanner = SubnetScanner()
+    private val subnetScanner by lazy { SubnetScanner(this) }
 
     // Unified device map — both mDNS and subnet scan write here.
     private val nsdSeen    = ConcurrentHashMap<String, DeviceInfo>()
@@ -51,6 +52,7 @@ class MainActivity : ComponentActivity() {
         setContentView(R.layout.activity_main)
 
         selectedDeviceText = findViewById(R.id.selectedDeviceText)
+        scanStatusText     = findViewById(R.id.scanStatusText)
         scanButton         = findViewById(R.id.scanButton)
         stopScanButton     = findViewById(R.id.refreshButton)
         manualNameInput    = findViewById(R.id.manualNameInput)
@@ -92,6 +94,7 @@ class MainActivity : ComponentActivity() {
             nsdSeen.clear()
             subnetSeen.clear()
             adapter.submitList(emptyList())
+            scanStatusText.text = ""
             toast("已停止搜索")
         }
 
@@ -141,6 +144,7 @@ class MainActivity : ComponentActivity() {
         nsdSeen.clear()
         subnetSeen.clear()
         adapter.submitList(emptyList())
+        scanStatusText.text = "正在初始化搜索…"
 
         // mDNS — works when router allows multicast
         nsdScanner.start(
@@ -149,20 +153,34 @@ class MainActivity : ComponentActivity() {
                 devices.forEach { nsdSeen[it.stableKey] = it }
                 refreshAdapter()
             },
-            onError = { /* mDNS failure is non-fatal; subnet scan is the reliable path */ }
+            onError = { /* non-fatal; subnet scan is the reliable path */ }
         )
 
-        // Subnet scan — starts 1 s later, works on any network where HTTP is reachable.
-        // 50 parallel probes × ~1 s timeout = ~6 s to scan a full /24.
-        toast("正在搜索局域网设备（最多约 6 秒）…")
+        // Subnet scan — starts 1 s later; 50 parallel probes × 1 s = ~6 s for a /24.
         thread(isDaemon = true) {
             Thread.sleep(1000)
             subnetScanner.scan(
+                onStart = { subnet ->
+                    runOnUiThread { scanStatusText.text = "子网扫描中: $subnet.1–254…" }
+                },
                 onFound = { device ->
                     subnetSeen[device.stableKey] = device
                     refreshAdapter()
                 },
-                onDone = { /* scan finished — nothing extra needed */ }
+                onProgress = { done, found ->
+                    if (done % 30 == 0 || done == 254) {
+                        runOnUiThread {
+                            scanStatusText.text = "子网扫描中: $done/254，已找到 $found 台设备"
+                        }
+                    }
+                },
+                onDone = {
+                    val total = subnetSeen.size + nsdSeen.size
+                    runOnUiThread {
+                        scanStatusText.text = if (total == 0) "扫描完成，未找到设备。请确认 cliplinkd 已运行并尝试手动输入 IP"
+                                             else "扫描完成，共找到 $total 台设备"
+                    }
+                }
             )
         }
     }
