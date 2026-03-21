@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os/signal"
@@ -15,7 +17,20 @@ import (
 	"cliplink/receiver/internal/httpapi"
 )
 
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
+
 func main() {
+	showVersion := flag.Bool("version", false, "print build version")
+	flag.Parse()
+	if *showVersion {
+		fmt.Printf("cliplinkd %s (commit=%s, built=%s)\n", version, commit, date)
+		return
+	}
+
 	cfg := config.FromEnv()
 
 	clipboardWriter := clipboard.NewSystemWriter()
@@ -61,7 +76,7 @@ func main() {
 	defer stop()
 
 	go func() {
-		log.Printf("cliplinkd listening on %s", cfg.ListenAddr)
+		log.Printf("cliplinkd %s listening on %s", version, cfg.ListenAddr)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("http server failed: %v", err)
 		}

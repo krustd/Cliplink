@@ -1,0 +1,88 @@
+version: 2
+
+project_name: cliplinkd
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: cliplinkd
+    binary: cliplinkd
+    main: ./cmd/cliplinkd
+    dir: receiver
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+
+archives:
+  - id: bundles
+    ids:
+      - cliplinkd
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      cliplinkd_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    files:
+      - src: receiver/README.md
+        dst: README.md
+
+nfpms:
+  - id: linux-packages
+    ids:
+      - cliplinkd
+    package_name: cliplinkd
+    vendor: krustd
+    homepage: https://github.com/krustd/Cliplink
+    maintainer: krustd
+    description: ClipLink desktop receiver daemon
+    license: MIT
+    formats:
+      - deb
+      - rpm
+      - apk
+      - archlinux
+    bindir: /usr/bin
+    section: utils
+    priority: optional
+    contents:
+      - src: receiver/README.md
+        dst: /usr/share/doc/cliplinkd/README.md
+    overrides:
+      apk:
+        dependencies:
+          - ca-certificates-bundle
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  github:
+    owner: krustd
+    name: Cliplink
+  prerelease: auto
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
