@@ -98,16 +98,22 @@
         android:layout_weight="1" />
 
     <Button
-        android:id="@+id/startServiceButton"
+        android:id="@+id/sendClipboardButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="启动后台自动同步" />
+        android:layout_marginTop="12dp"
+        android:text="📋 发送剪贴板"
+        android:textSize="16sp" />
 
-    <Button
-        android:id="@+id/stopServiceButton"
+    <TextView
+        android:id="@+id/sendStatusText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="停止后台同步" />
+        android:padding="10dp"
+        android:textSize="12sp"
+        android:fontFamily="monospace"
+        android:background="@android:drawable/editbox_background_normal"
+        android:text="" />
 
 </LinearLayout>

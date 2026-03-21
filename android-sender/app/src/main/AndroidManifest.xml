@@ -27,11 +27,31 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.ShareActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AppCompat.Dialog.Alert"
+            android:excludeFromRecents="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ui.ClipSendActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MaterialComponents.Light.Dialog.Alert"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:noHistory="true" />
+
         <service
-            android:name=".service.ClipboardRelayService"
-            android:enabled="true"
+            android:name=".service.ClipLinkNotificationService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
     </application>
 
 </manifest>

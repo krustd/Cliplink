@@ -1,6 +1,8 @@
 package com.cliplink.sender.ui
 
 import android.Manifest
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -10,6 +12,7 @@ import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -19,7 +22,8 @@ import com.cliplink.sender.data.DeviceInfo
 import com.cliplink.sender.data.DeviceStore
 import com.cliplink.sender.discovery.NsdScanner
 import com.cliplink.sender.discovery.SubnetScanner
-import com.cliplink.sender.service.ClipboardRelayService
+import com.cliplink.sender.service.ClipLinkNotificationService
+import com.cliplink.sender.service.SenderClient
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
@@ -34,33 +38,37 @@ class MainActivity : ComponentActivity() {
     private lateinit var manualTargetInput: EditText
     private lateinit var saveManualButton: Button
     private lateinit var pingButton: Button
-    private lateinit var startServiceButton: Button
-    private lateinit var stopServiceButton: Button
+    private lateinit var sendClipboardButton: Button
+    private lateinit var sendStatusText: TextView
 
     private lateinit var deviceStore: DeviceStore
     private lateinit var nsdScanner: NsdScanner
     private val subnetScanner by lazy { SubnetScanner(this) }
 
-    // Unified device map — both mDNS and subnet scan write here.
     private val nsdSeen    = ConcurrentHashMap<String, DeviceInfo>()
     private val subnetSeen = ConcurrentHashMap<String, DeviceInfo>()
 
     private lateinit var adapter: DeviceAdapter
 
+    private val requestNotificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) ClipLinkNotificationService.start(this)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        selectedDeviceText = findViewById(R.id.selectedDeviceText)
-        scanStatusText     = findViewById(R.id.scanStatusText)
-        scanButton         = findViewById(R.id.scanButton)
-        stopScanButton     = findViewById(R.id.refreshButton)
-        manualNameInput    = findViewById(R.id.manualNameInput)
-        manualTargetInput  = findViewById(R.id.manualTargetInput)
-        saveManualButton   = findViewById(R.id.saveManualButton)
-        pingButton         = findViewById(R.id.pingButton)
-        startServiceButton = findViewById(R.id.startServiceButton)
-        stopServiceButton  = findViewById(R.id.stopServiceButton)
+        selectedDeviceText  = findViewById(R.id.selectedDeviceText)
+        scanStatusText      = findViewById(R.id.scanStatusText)
+        scanButton          = findViewById(R.id.scanButton)
+        stopScanButton      = findViewById(R.id.refreshButton)
+        manualNameInput     = findViewById(R.id.manualNameInput)
+        manualTargetInput   = findViewById(R.id.manualTargetInput)
+        saveManualButton    = findViewById(R.id.saveManualButton)
+        pingButton          = findViewById(R.id.pingButton)
+        sendClipboardButton = findViewById(R.id.sendClipboardButton)
+        sendStatusText      = findViewById(R.id.sendStatusText)
 
         deviceStore = DeviceStore(this)
         nsdScanner  = NsdScanner(this)
@@ -78,7 +86,21 @@ class MainActivity : ComponentActivity() {
             manualTargetInput.setText("${selected.host}:${selected.port}")
         }
         bindActions()
-        requestNotificationPermissionIfNeeded()
+        startNotificationService()
+        RomCompat.showPermissionGuideIfNeeded(this)
+    }
+
+    private fun startNotificationService() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED) {
+                ClipLinkNotificationService.start(this)
+            } else {
+                requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        } else {
+            ClipLinkNotificationService.start(this)
+        }
     }
 
     override fun onDestroy() {
@@ -123,40 +145,53 @@ class MainActivity : ComponentActivity() {
 
         pingButton.setOnClickListener { pingCurrentDevice() }
 
-        startServiceButton.setOnClickListener {
-            if (deviceStore.load() == null) {
-                toast("请先选择一个接收设备")
-                return@setOnClickListener
-            }
-            ContextCompat.startForegroundService(this, Intent(this, ClipboardRelayService::class.java))
-            toast("后台自动同步已启动")
-        }
+        sendClipboardButton.setOnClickListener { sendCurrentClipboard() }
+    }
 
-        stopServiceButton.setOnClickListener {
-            stopService(Intent(this, ClipboardRelayService::class.java))
-            toast("后台自动同步已停止")
+    private fun sendCurrentClipboard() {
+        val device = deviceStore.load()
+        if (device == null) {
+            toast("请先选择或手动保存一个设备")
+            return
+        }
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = cm.primaryClip
+        if (clip == null || clip.itemCount == 0) {
+            toast("剪贴板为空")
+            return
+        }
+        val text = clip.getItemAt(0).coerceToText(this)?.toString()?.trim()
+        if (text.isNullOrBlank()) {
+            toast("剪贴板内容为空")
+            return
+        }
+        sendStatusText.text = "📤 正在发送…\n「${text.take(80)}」"
+        thread(isDaemon = true) {
+            val result = SenderClient.pushText(device, text)
+            runOnUiThread {
+                sendStatusText.text = if (result.isSuccess)
+                    "✅ 发送成功 → ${device.host}:${device.port}\n「${text.take(80)}」"
+                else
+                    "❌ 发送失败：${result.exceptionOrNull()?.message}\n「${text.take(80)}」"
+            }
         }
     }
 
-    // Starts mDNS immediately and launches the subnet scan 1 second later
-    // (same strategy as LocalSend: give multicast a chance first).
     private fun startScan() {
         nsdSeen.clear()
         subnetSeen.clear()
         adapter.submitList(emptyList())
         scanStatusText.text = "正在初始化搜索…"
 
-        // mDNS — works when router allows multicast
         nsdScanner.start(
             onUpdate = { devices ->
                 nsdSeen.clear()
                 devices.forEach { nsdSeen[it.stableKey] = it }
                 refreshAdapter()
             },
-            onError = { /* non-fatal; subnet scan is the reliable path */ }
+            onError = {}
         )
 
-        // Subnet scan — starts 1 s later; 50 parallel probes × 1 s = ~6 s for a /24.
         thread(isDaemon = true) {
             Thread.sleep(1000)
             subnetScanner.scan(
@@ -177,8 +212,10 @@ class MainActivity : ComponentActivity() {
                 onDone = {
                     val total = subnetSeen.size + nsdSeen.size
                     runOnUiThread {
-                        scanStatusText.text = if (total == 0) "扫描完成，未找到设备。请确认 cliplinkd 已运行并尝试手动输入 IP"
-                                             else "扫描完成，共找到 $total 台设备"
+                        scanStatusText.text = if (total == 0)
+                            "扫描完成，未找到设备。请确认 cliplinkd 已运行并尝试手动输入 IP"
+                        else
+                            "扫描完成，共找到 $total 台设备"
                     }
                 }
             )
@@ -197,8 +234,8 @@ class MainActivity : ComponentActivity() {
         renderSelected(device)
         manualNameInput.setText(device.name)
         manualTargetInput.setText("${device.host}:${device.port}")
-        ContextCompat.startForegroundService(this, Intent(this, ClipboardRelayService::class.java))
-        toast("已选择并启动后台同步: ${device.name}")
+        toast("已选择设备: ${device.name}")
+        startNotificationService()
     }
 
     private fun renderSelected(device: DeviceInfo?) {
@@ -232,11 +269,6 @@ class MainActivity : ComponentActivity() {
                     if (code in 200..299) {
                         result.appendLine("✅ HTTP 连接成功")
                         result.appendLine("状态: $code  延迟: ${ms}ms")
-                        result.appendLine()
-                        result.appendLine("手机 → 电脑 网络正常。")
-                        result.appendLine("如果剪贴板仍不同步，请检查：")
-                        result.appendLine("· 后台同步服务是否已启动")
-                        result.appendLine("· 系统是否限制了后台 App")
                     } else {
                         result.appendLine("⚠️ HTTP 返回异常状态: $code")
                     }
@@ -274,12 +306,6 @@ class MainActivity : ComponentActivity() {
                     .show()
             }
         }
-    }
-
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
-        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
     }
 
     private fun toast(msg: String) {
