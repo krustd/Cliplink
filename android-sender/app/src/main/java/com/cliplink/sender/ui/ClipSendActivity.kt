@@ -61,6 +61,14 @@ class ClipSendActivity : ComponentActivity() {
 
         statusText.text = "正在发送到 ${device.name}…"
         thread(isDaemon = true) {
+            val health = SenderClient.checkHealth(device)
+            if (!health.ok) {
+                runOnUiThread {
+                    toast("接收端不在线: ${health.message}")
+                    finish()
+                }
+                return@thread
+            }
             val result = SenderClient.pushText(device, text)
             runOnUiThread {
                 if (result.isSuccess) {

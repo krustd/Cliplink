@@ -3,10 +3,10 @@ package com.cliplink.sender.ui
 import android.Manifest
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -24,16 +24,17 @@ import com.cliplink.sender.discovery.NsdScanner
 import com.cliplink.sender.discovery.SubnetScanner
 import com.cliplink.sender.service.ClipLinkNotificationService
 import com.cliplink.sender.service.SenderClient
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 class MainActivity : ComponentActivity() {
     private lateinit var selectedDeviceText: TextView
+    private lateinit var selectedDeviceMetaText: TextView
+    private lateinit var selectedDeviceStatusText: TextView
     private lateinit var scanStatusText: TextView
-    private lateinit var scanButton: Button
-    private lateinit var stopScanButton: Button
+    private lateinit var emptyDevicesText: TextView
+    private lateinit var refreshButton: Button
     private lateinit var manualNameInput: EditText
     private lateinit var manualTargetInput: EditText
     private lateinit var saveManualButton: Button
@@ -47,8 +48,10 @@ class MainActivity : ComponentActivity() {
 
     private val nsdSeen    = ConcurrentHashMap<String, DeviceInfo>()
     private val subnetSeen = ConcurrentHashMap<String, DeviceInfo>()
+    private val scanSession = AtomicInteger(0)
 
     private lateinit var adapter: DeviceAdapter
+    private var lastScanStartedAt = 0L
 
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -60,9 +63,11 @@ class MainActivity : ComponentActivity() {
         setContentView(R.layout.activity_main)
 
         selectedDeviceText  = findViewById(R.id.selectedDeviceText)
+        selectedDeviceMetaText = findViewById(R.id.selectedDeviceMetaText)
+        selectedDeviceStatusText = findViewById(R.id.selectedDeviceStatusText)
         scanStatusText      = findViewById(R.id.scanStatusText)
-        scanButton          = findViewById(R.id.scanButton)
-        stopScanButton      = findViewById(R.id.refreshButton)
+        emptyDevicesText    = findViewById(R.id.emptyDevicesText)
+        refreshButton       = findViewById(R.id.refreshButton)
         manualNameInput     = findViewById(R.id.manualNameInput)
         manualTargetInput   = findViewById(R.id.manualTargetInput)
         saveManualButton    = findViewById(R.id.saveManualButton)
@@ -88,6 +93,17 @@ class MainActivity : ComponentActivity() {
         bindActions()
         startNotificationService()
         RomCompat.showPermissionGuideIfNeeded(this)
+        startScan(userInitiated = false)
+        refreshSelectedDeviceHealth(showToastOnFailure = false)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val shouldRefresh = System.currentTimeMillis() - lastScanStartedAt > AUTO_SCAN_INTERVAL_MS
+        if (shouldRefresh) {
+            startScan(userInitiated = false)
+        }
+        refreshSelectedDeviceHealth(showToastOnFailure = false)
     }
 
     private fun startNotificationService() {
@@ -109,16 +125,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun bindActions() {
-        scanButton.setOnClickListener { startScan() }
-
-        stopScanButton.setOnClickListener {
-            nsdScanner.stop()
-            nsdSeen.clear()
-            subnetSeen.clear()
-            adapter.submitList(emptyList())
-            scanStatusText.text = ""
-            toast("已停止搜索")
-        }
+        refreshButton.setOnClickListener { startScan(userInitiated = true) }
 
         saveManualButton.setOnClickListener {
             val rawTarget = manualTargetInput.text?.toString()?.trim().orEmpty()
@@ -165,57 +172,91 @@ class MainActivity : ComponentActivity() {
             toast("剪贴板内容为空")
             return
         }
-        sendStatusText.text = "📤 正在发送…\n「${text.take(80)}」"
+
+        sendClipboardButton.isEnabled = false
+        sendStatusText.text = "发送前检查接收端状态…"
         thread(isDaemon = true) {
+            val health = SenderClient.checkHealth(device)
+            if (!health.ok) {
+                runOnUiThread {
+                    sendClipboardButton.isEnabled = true
+                    applyHealthResult(device, health)
+                    sendStatusText.text = "发送已取消：${health.message}"
+                    showOfflineDialog(device, health.message)
+                }
+                return@thread
+            }
+
+            runOnUiThread {
+                applyHealthResult(device, health)
+                sendStatusText.text = "正在发送剪贴板到 ${device.name}…"
+            }
+
             val result = SenderClient.pushText(device, text)
             runOnUiThread {
-                sendStatusText.text = if (result.isSuccess)
-                    "✅ 发送成功 → ${device.host}:${device.port}\n「${text.take(80)}」"
-                else
-                    "❌ 发送失败：${result.exceptionOrNull()?.message}\n「${text.take(80)}」"
+                sendClipboardButton.isEnabled = true
+                sendStatusText.text = if (result.isSuccess) {
+                    "已发送到 ${device.name}\n${text.take(80)}"
+                } else {
+                    "发送失败：${result.exceptionOrNull()?.message ?: "未知错误"}"
+                }
             }
         }
     }
 
-    private fun startScan() {
+    private fun startScan(userInitiated: Boolean) {
+        val sessionId = scanSession.incrementAndGet()
+        lastScanStartedAt = System.currentTimeMillis()
+        nsdScanner.stop()
         nsdSeen.clear()
         subnetSeen.clear()
         adapter.submitList(emptyList())
-        scanStatusText.text = "正在初始化搜索…"
+        renderDevices(emptyList())
+        scanStatusText.text = if (userInitiated) "正在重新搜索附近设备…" else "正在自动搜索附近设备…"
 
         nsdScanner.start(
             onUpdate = { devices ->
+                if (sessionId != scanSession.get()) return@start
                 nsdSeen.clear()
                 devices.forEach { nsdSeen[it.stableKey] = it }
                 refreshAdapter()
             },
-            onError = {}
+            onError = { message ->
+                if (sessionId != scanSession.get()) return@start
+                runOnUiThread { scanStatusText.text = message }
+            }
         )
 
         thread(isDaemon = true) {
-            Thread.sleep(1000)
+            Thread.sleep(800)
             subnetScanner.scan(
                 onStart = { subnet ->
-                    runOnUiThread { scanStatusText.text = "子网扫描中: $subnet.1–254…" }
+                    if (sessionId != scanSession.get()) return@scan
+                    runOnUiThread { scanStatusText.text = "正在扫描 $subnet.1-254 网段…" }
                 },
                 onFound = { device ->
+                    if (sessionId != scanSession.get()) return@scan
                     subnetSeen[device.stableKey] = device
                     refreshAdapter()
                 },
                 onProgress = { done, found ->
+                    if (sessionId != scanSession.get()) return@scan
                     if (done % 30 == 0 || done == 254) {
                         runOnUiThread {
-                            scanStatusText.text = "子网扫描中: $done/254，已找到 $found 台设备"
+                            scanStatusText.text = "子网扫描 $done/254，已发现 $found 台设备"
                         }
                     }
                 },
                 onDone = {
-                    val total = subnetSeen.size + nsdSeen.size
+                    if (sessionId != scanSession.get()) return@scan
+                    val total = (subnetSeen.values + nsdSeen.values)
+                        .distinctBy { it.endpointKey }
+                        .size
                     runOnUiThread {
                         scanStatusText.text = if (total == 0)
-                            "扫描完成，未找到设备。请确认 cliplinkd 已运行并尝试手动输入 IP"
+                            "没有找到设备，可以手动输入 IP:端口 直接连接"
                         else
-                            "扫描完成，共找到 $total 台设备"
+                            "已发现 $total 台设备，点一下就能切换"
                     }
                 }
             )
@@ -224,26 +265,60 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshAdapter() {
         val merged = (nsdSeen.values + subnetSeen.values)
-            .distinctBy { it.stableKey }
+            .distinctBy { it.endpointKey }
             .sortedBy { it.name }
-        runOnUiThread { adapter.submitList(merged) }
+        runOnUiThread {
+            val current = deviceStore.load()
+            if (current != null) {
+                val rediscovered = merged.firstOrNull { it.endpointKey == current.endpointKey }
+                if (rediscovered == null) {
+                    clearSelectedDevice("原先选择的设备已不在当前在线列表中")
+                } else {
+                    if (rediscovered != current) {
+                        onDeviceSelected(rediscovered, showToast = false)
+                    }
+                }
+            }
+            renderDevices(merged)
+        }
     }
 
-    private fun onDeviceSelected(device: DeviceInfo) {
+    private fun renderDevices(devices: List<DeviceInfo>) {
+        adapter.selectedEndpoint = deviceStore.load()?.endpointKey
+        adapter.submitList(devices)
+        emptyDevicesText.text = if (devices.isEmpty()) {
+            "正在自动搜索设备…\n如果电脑端已启动，通常几秒内就会出现。"
+        } else {
+            ""
+        }
+        emptyDevicesText.visibility = if (devices.isEmpty()) View.VISIBLE else View.GONE
+    }
+
+    private fun onDeviceSelected(device: DeviceInfo, showToast: Boolean = true) {
         deviceStore.save(device)
         renderSelected(device)
         manualNameInput.setText(device.name)
         manualTargetInput.setText("${device.host}:${device.port}")
-        toast("已选择设备: ${device.name}")
+        adapter.selectedEndpoint = device.endpointKey
+        if (showToast) {
+            toast("已切换到 ${device.name}")
+        }
         startNotificationService()
+        refreshSelectedDeviceHealth(showToastOnFailure = false)
     }
 
     private fun renderSelected(device: DeviceInfo?) {
         selectedDeviceText.text = if (device == null) {
-            "当前未选择接收设备"
+            "还没有选择接收端"
         } else {
-            "当前设备: ${device.name} (${device.host}:${device.port})"
+            device.name
         }
+        selectedDeviceMetaText.text = if (device == null) {
+            "打开后会自动搜索附近设备，也可以手动输入地址"
+        } else {
+            "${device.host}:${device.port} · ${device.os ?: "unknown-os"}"
+        }
+        selectedDeviceStatusText.text = if (device == null) "尚未选择设备" else "等待检查在线状态"
     }
 
     private fun pingCurrentDevice() {
@@ -252,63 +327,88 @@ class MainActivity : ComponentActivity() {
             toast("请先选择或手动保存一个设备")
             return
         }
-        toast("正在测试连接 ${device.host}:${device.port}…")
+        selectedDeviceStatusText.text = "正在检查在线状态…"
         thread(isDaemon = true) {
-            val result = StringBuilder()
-            result.appendLine("目标: ${device.name}")
-            result.appendLine("地址: ${device.host}:${device.port}")
-            result.appendLine()
-            try {
-                val conn = URL("http://${device.host}:${device.port}/healthz").openConnection() as HttpURLConnection
-                conn.connectTimeout = 3000
-                conn.readTimeout = 3000
-                val t0 = System.currentTimeMillis()
-                try {
-                    val code = conn.responseCode
-                    val ms = System.currentTimeMillis() - t0
-                    if (code in 200..299) {
-                        result.appendLine("✅ HTTP 连接成功")
-                        result.appendLine("状态: $code  延迟: ${ms}ms")
-                    } else {
-                        result.appendLine("⚠️ HTTP 返回异常状态: $code")
-                    }
-                } finally {
-                    conn.disconnect()
-                }
-            } catch (e: java.net.ConnectException) {
-                result.appendLine("❌ 连接被拒绝")
-                result.appendLine("原因: ${e.message}")
-                result.appendLine()
-                result.appendLine("可能是：")
-                result.appendLine("· cliplinkd 没有运行")
-                result.appendLine("· 端口号错误（默认 43837）")
-                result.appendLine("· 电脑防火墙拦截了该端口")
-            } catch (e: java.net.SocketTimeoutException) {
-                result.appendLine("❌ 连接超时（3 秒）")
-                result.appendLine()
-                result.appendLine("可能是：")
-                result.appendLine("· IP 地址不对，目标主机不可达")
-                result.appendLine("· 手机和电脑不在同一 WiFi")
-                result.appendLine("· 路由器开启了 AP 隔离")
-            } catch (e: java.net.UnknownHostException) {
-                result.appendLine("❌ 无法解析主机名")
-                result.appendLine("原因: ${e.message}")
-            } catch (e: Exception) {
-                result.appendLine("❌ 未知错误")
-                result.appendLine("${e.javaClass.simpleName}: ${e.message}")
-            }
+            val result = SenderClient.checkHealth(device)
 
             runOnUiThread {
+                applyHealthResult(device, result)
                 AlertDialog.Builder(this)
-                    .setTitle("连接测试结果")
-                    .setMessage(result.toString().trimEnd())
+                    .setTitle(if (result.ok) "接收端在线" else "接收端暂不可用")
+                    .setMessage(buildHealthMessage(device, result))
                     .setPositiveButton("确定", null)
                     .show()
             }
         }
     }
 
+    private fun refreshSelectedDeviceHealth(showToastOnFailure: Boolean) {
+        val device = deviceStore.load() ?: return
+        selectedDeviceStatusText.text = "正在检查在线状态…"
+        thread(isDaemon = true) {
+            val result = SenderClient.checkHealth(device)
+            runOnUiThread {
+                applyHealthResult(device, result)
+                if (showToastOnFailure && !result.ok) {
+                    toast(result.message)
+                }
+            }
+        }
+    }
+
+    private fun applyHealthResult(device: DeviceInfo, result: SenderClient.HealthCheckResult) {
+        val stillSelected = deviceStore.load()?.endpointKey == device.endpointKey
+        if (!result.ok && stillSelected) {
+            clearSelectedDevice("当前设备已离线，请重新选择可用接收端")
+            return
+        }
+
+        val suffix = result.latencyMs?.let { " · ${it}ms" }.orEmpty()
+        selectedDeviceStatusText.text = if (result.ok) {
+            "在线$suffix"
+        } else {
+            "离线 · ${result.message}"
+        }
+        if (deviceStore.load()?.endpointKey == device.endpointKey) {
+            selectedDeviceMetaText.text = "${device.host}:${device.port} · ${device.os ?: "unknown-os"}"
+        }
+    }
+
+    private fun clearSelectedDevice(statusMessage: String) {
+        deviceStore.clear()
+        renderSelected(null)
+        adapter.selectedEndpoint = null
+        sendStatusText.text = statusMessage
+    }
+
+    private fun buildHealthMessage(device: DeviceInfo, result: SenderClient.HealthCheckResult): String {
+        return buildString {
+            appendLine("目标设备：${device.name}")
+            appendLine("地址：${device.host}:${device.port}")
+            appendLine()
+            appendLine(result.message)
+            result.statusCode?.let { appendLine("HTTP 状态：$it") }
+            result.latencyMs?.let { appendLine("延迟：${it}ms") }
+            if (!result.ok) {
+                appendLine()
+                append("建议：确认电脑端 cliplinkd 已运行，并检查手机与电脑是否在同一网络")
+            }
+        }.trimEnd()
+    }
+
+    private fun showOfflineDialog(device: DeviceInfo, reason: String) {
+        AlertDialog.Builder(this)
+            .setTitle("暂时无法发送")
+            .setMessage("接收端 ${device.name} 当前不在线。\n\n$reason")
+            .setPositiveButton("知道了", null)
+            .show()
+    }
+
     private fun toast(msg: String) {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    }
+
+    companion object {
+        private const val AUTO_SCAN_INTERVAL_MS = 15_000L
     }
 }

@@ -2,6 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/pageBackground"
     android:orientation="vertical"
     android:padding="16dp">
 
@@ -10,25 +11,66 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="ClipLink Sender"
-        android:textSize="24sp"
+        android:textColor="@color/textPrimary"
+        android:textSize="28sp"
         android:textStyle="bold" />
 
     <TextView
         android:id="@+id/subtitleText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="扫描局域网接收端并选择一个设备"
+        android:layout_marginTop="6dp"
+        android:text="打开后会自动搜索接收端，发送前也会先检查是否在线。"
+        android:textColor="@color/textSecondary"
         android:textSize="14sp" />
 
-    <TextView
-        android:id="@+id/selectedDeviceText"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:padding="12dp"
-        android:text="当前未选择接收设备"
-        android:background="@android:drawable/editbox_background_normal" />
+        android:background="@drawable/bg_selected_device"
+        android:orientation="vertical"
+        android:padding="18dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="当前接收端"
+            android:textColor="@color/textSecondary"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/selectedDeviceText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="还没有选择接收端"
+            android:textColor="@color/textPrimary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/selectedDeviceMetaText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="@color/textSecondary"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/selectedDeviceStatusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_status_pill"
+            android:paddingStart="12dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="6dp"
+            android:text="等待检查在线状态"
+            android:textColor="@color/colorPrimaryDark"
+            android:textSize="12sp" />
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -37,72 +79,116 @@
         android:orientation="horizontal">
 
         <Button
-            android:id="@+id/scanButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="搜索设备" />
-
-        <Button
             android:id="@+id/refreshButton"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
-            android:text="停止搜索" />
+            android:text="重新搜索" />
+
+        <Button
+            android:id="@+id/pingButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:text="检查在线" />
     </LinearLayout>
-
-    <EditText
-        android:id="@+id/manualNameInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:hint="手动设备名（可选）" />
-
-    <EditText
-        android:id="@+id/manualTargetInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:hint="手动输入 IP:端口，例如 192.168.1.8:43837"
-        android:inputType="textUri" />
-
-    <Button
-        android:id="@+id/saveManualButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="手动保存并使用" />
-
-    <Button
-        android:id="@+id/pingButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="🔍 连接测试" />
 
     <TextView
         android:id="@+id/scanStatusText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:textSize="12sp"
-        android:textColor="#888888"
-        android:text="" />
+        android:layout_marginTop="10dp"
+        android:textColor="@color/textSecondary"
+        android:textSize="12sp" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/devicesRecyclerView"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="12dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:background="@drawable/bg_section_card"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="附近设备"
+            android:textColor="@color/textPrimary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/emptyDevicesText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="center"
+            android:text="正在自动搜索设备…"
+            android:textColor="@color/textSecondary"
+            android:textSize="14sp" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/devicesRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="12dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingBottom="4dp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_section_card"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="手动连接"
+            android:textColor="@color/textPrimary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/manualNameInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@android:drawable/edit_text"
+            android:hint="设备名称，可留空"
+            android:inputType="textCapWords"
+            android:padding="12dp" />
+
+        <EditText
+            android:id="@+id/manualTargetInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@android:drawable/edit_text"
+            android:hint="输入 IP:端口，例如 192.168.1.8:43837"
+            android:inputType="textUri"
+            android:padding="12dp" />
+
+        <Button
+            android:id="@+id/saveManualButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="10dp"
+            android:text="保存并切换到这个地址" />
+    </LinearLayout>
 
     <Button
         android:id="@+id/sendClipboardButton"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="52dp"
         android:layout_marginTop="12dp"
-        android:text="📋 发送剪贴板"
+        android:text="发送剪贴板"
         android:textSize="16sp" />
 
     <TextView
@@ -110,10 +196,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:padding="10dp"
-        android:textSize="12sp"
-        android:fontFamily="monospace"
-        android:background="@android:drawable/editbox_background_normal"
-        android:text="" />
+        android:background="@drawable/bg_section_card"
+        android:padding="12dp"
+        android:textColor="@color/textSecondary"
+        android:textSize="12sp" />
 
 </LinearLayout>

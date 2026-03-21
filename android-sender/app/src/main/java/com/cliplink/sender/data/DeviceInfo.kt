@@ -6,6 +6,9 @@ data class DeviceInfo(
     val port: Int,
     val os: String? = null
 ) {
+    val endpointKey: String
+        get() = "$host:$port"
+
     val baseUrl: String
         get() = "http://$host:$port"
 

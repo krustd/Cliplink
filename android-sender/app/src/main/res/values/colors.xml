@@ -2,4 +2,11 @@
     <color name="colorPrimary">#1A4D8F</color>
     <color name="colorPrimaryDark">#123666</color>
     <color name="colorAccent">#25A18E</color>
+    <color name="pageBackground">#F3F6FB</color>
+    <color name="surfaceCard">#FFFFFFFF</color>
+    <color name="surfaceSoft">#EAF1FB</color>
+    <color name="surfaceSelected">#D9E8FF</color>
+    <color name="strokeSoft">#D5DDEA</color>
+    <color name="textPrimary">#122033</color>
+    <color name="textSecondary">#5F6F84</color>
 </resources>

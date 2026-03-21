@@ -27,6 +27,10 @@ class DeviceStore(context: Context) {
         )
     }
 
+    fun clear() {
+        prefs.edit().clear().apply()
+    }
+
     companion object {
         private const val KEY_NAME = "target_name"
         private const val KEY_HOST = "target_host"
