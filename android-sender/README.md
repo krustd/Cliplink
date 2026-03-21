@@ -85,8 +85,9 @@ cd android-sender
 
 ## 发布
 
-- 推送 `android-sender-v*` tag 后，GitHub Actions 会自动构建并上传 signed release APK
+- 推送标准语义化版本 tag，例如 `v0.1.2` 后，GitHub Actions 会自动构建并上传 signed release APK
 - 仓库已配置 release keystore secrets，后续正式版本会沿用同一把签名密钥，保证用户可直接覆盖升级
+- Android 与 receiver 统一使用同一个版本号，并发布到同一个 GitHub Release
 - 本地如需手动打正式包，可在 `android-sender/` 目录执行 `./gradlew assembleRelease`
 
 ---

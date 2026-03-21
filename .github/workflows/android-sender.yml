@@ -12,7 +12,7 @@ on:
     branches:
       - main
     tags:
-      - "android-sender-v*"
+      - "v*"
   workflow_dispatch:
 
 jobs:
@@ -43,7 +43,7 @@ jobs:
 
   build-release:
     name: Build Signed Release APK
-    if: startsWith(github.ref, 'refs/tags/android-sender-v')
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
 
     steps:
