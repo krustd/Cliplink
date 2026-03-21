@@ -1,6 +1,6 @@
 version: 2
 
-project_name: cliplinkd
+project_name: cliplink-receiver
 
 builds:
   - id: cliplinkd
@@ -33,7 +33,7 @@ archives:
         formats:
           - zip
     name_template: >-
-      cliplinkd_
+      cliplink-receiver_
       {{- .Version }}_
       {{- .Os }}_
       {{- .Arch }}
@@ -45,7 +45,7 @@ nfpms:
   - id: linux-packages
     ids:
       - cliplinkd
-    package_name: cliplinkd
+    package_name: cliplink-receiver
     vendor: krustd
     homepage: https://github.com/krustd/Cliplink
     maintainer: krustd
@@ -61,7 +61,7 @@ nfpms:
     priority: optional
     contents:
       - src: receiver/README.md
-        dst: /usr/share/doc/cliplinkd/README.md
+        dst: /usr/share/doc/cliplink-receiver/README.md
     overrides:
       apk:
         dependencies:
