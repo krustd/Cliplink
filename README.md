@@ -57,4 +57,4 @@ go run ./cmd/cliplinkd
 ## 发布
 
 - Android 发送端：推送 tag `android-sender-v*` 后，GitHub Actions 会自动构建已签名的 release APK 并附加到 GitHub Release
-- Receiver 桌面端：推送 tag `receiver-v*` 后，GitHub Actions 会自动发布 Windows 压缩包、macOS 压缩包以及 Linux `deb`、`rpm`、`apk`、`archlinux` 包
+- Receiver 桌面端：推送标准语义化版本 tag，例如 `v0.1.0`，GitHub Actions 会自动发布 Windows 压缩包、macOS 压缩包以及 Linux `deb`、`rpm`、`apk`、`archlinux` 包

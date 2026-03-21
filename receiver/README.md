@@ -32,7 +32,7 @@ go run ./cmd/cliplinkd --version
 
 ## 发布包
 
-- 推送 `receiver-v*` tag 后，GitHub Actions 会自动发布跨平台构建产物
+- 推送标准语义化版本 tag，例如 `v0.1.0` 后，GitHub Actions 会自动发布跨平台构建产物
 - 产物包含 Windows `.zip`、macOS `.tar.gz`，以及 Linux `deb`、`rpm`、`apk`、`archlinux` 包
 - 如只想本地生成单个可执行文件，继续使用 `go build ./cmd/cliplinkd` 即可
 
