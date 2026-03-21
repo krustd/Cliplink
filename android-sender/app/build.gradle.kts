@@ -1,4 +1,5 @@
 import java.util.Properties
+import com.android.build.gradle.internal.api.BaseVariantOutputImpl
 
 plugins {
     id("com.android.application")
@@ -17,6 +18,14 @@ fun signingValue(name: String): String? {
         ?: signingProps.getProperty(name)
 }
 
+fun releaseVersionName(): String {
+    val rawTag = System.getenv("GITHUB_REF_NAME")
+    return when {
+        !rawTag.isNullOrBlank() && rawTag.startsWith("v") -> rawTag
+        else -> "v0.1.0"
+    }
+}
+
 android {
     namespace = "com.cliplink.sender"
     compileSdk = 35
@@ -26,7 +35,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = releaseVersionName().removePrefix("v")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -71,6 +80,15 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+}
+
+android.applicationVariants.all {
+    if (buildType.name == "release") {
+        outputs.all {
+            (this as? BaseVariantOutputImpl)?.outputFileName =
+                "cliplink-sender-android-v${versionName}.apk"
+        }
     }
 }
 
