@@ -9,13 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.cliplink.sender.data.DeviceInfo
-import org.json.JSONObject
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetAddress
-import java.net.SocketTimeoutException
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.concurrent.thread
 
 class NsdScanner(context: Context) {
     private val appContext = context.applicationContext
@@ -28,10 +22,6 @@ class NsdScanner(context: Context) {
 
     fun start(onUpdate: (List<DeviceInfo>) -> Unit, onError: (String) -> Unit) {
         if (discoveryListener != null) return
-
-        // UDP broadcast runs in parallel with mDNS — works even when the
-        // router blocks multicast traffic between WiFi clients.
-        startUdpScan(onUpdate)
 
         fun resolveService(serviceInfo: NsdServiceInfo) {
             nsdManager.resolveService(serviceInfo, object : NsdManager.ResolveListener {
@@ -100,12 +90,11 @@ class NsdScanner(context: Context) {
 
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
                 Log.e(TAG, "Start discovery failed, errorCode=$errorCode")
-                onError("启动搜索失败: $errorCode")
+                onError("mDNS 启动失败: $errorCode")
             }
 
             override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
                 Log.e(TAG, "Stop discovery failed, errorCode=$errorCode")
-                onError("停止搜索失败: $errorCode")
             }
         }
 
@@ -126,53 +115,10 @@ class NsdScanner(context: Context) {
         seen.clear()
     }
 
-    // Sends a UDP broadcast probe and collects replies for 4 seconds.
-    // Results are merged into the same `seen` map so the UI list stays unified.
-    private fun startUdpScan(onUpdate: (List<DeviceInfo>) -> Unit) {
-        thread(name = "cliplink-udp-scan", isDaemon = true) {
-            try {
-                val socket = DatagramSocket()
-                socket.broadcast = true
-                socket.soTimeout = 500  // short timeout so we can loop until deadline
-
-                val probe = UDP_PROBE.toByteArray(Charsets.UTF_8)
-                val broadcast = InetAddress.getByName("255.255.255.255")
-                socket.send(DatagramPacket(probe, probe.size, broadcast, UDP_DISCOVERY_PORT))
-                Log.i(TAG, "UDP broadcast sent to 255.255.255.255:$UDP_DISCOVERY_PORT")
-
-                val buf = ByteArray(512)
-                val deadline = System.currentTimeMillis() + 4000L
-                while (System.currentTimeMillis() < deadline) {
-                    try {
-                        val pkt = DatagramPacket(buf, buf.size)
-                        socket.receive(pkt)
-                        val text = String(pkt.data, 0, pkt.length, Charsets.UTF_8)
-                        val json = JSONObject(text)
-                        val host = pkt.address?.hostAddress?.substringBefore('%') ?: continue
-                        val name = json.optString("name").takeIf { it.isNotBlank() } ?: host
-                        val port = json.optInt("port", 43837)
-                        val os = json.optString("os").takeIf { it.isNotBlank() }
-                        val device = DeviceInfo(name = name, host = host, port = port, os = os)
-                        Log.i(TAG, "UDP found: $name @ $host:$port")
-                        seen[device.stableKey] = device
-                        onUpdate(seen.values.sortedBy { it.name })
-                    } catch (_: SocketTimeoutException) {
-                        // normal — keep waiting until deadline
-                    }
-                }
-                socket.close()
-            } catch (e: Exception) {
-                Log.w(TAG, "UDP scan error: ${e.message}")
-            }
-        }
-    }
-
     companion object {
         private const val TAG = "NsdScanner"
         private const val SERVICE_TYPE = "_cliplink._tcp."
         private const val SERVICE_TYPE_NO_DOT = "_cliplink._tcp"
-        private const val UDP_PROBE = "CLIPLINK_DISCOVER"
-        const val UDP_DISCOVERY_PORT = 43838
 
         private fun isClipLinkServiceType(raw: String): Boolean {
             return raw == SERVICE_TYPE ||

@@ -18,9 +18,11 @@ import com.cliplink.sender.R
 import com.cliplink.sender.data.DeviceInfo
 import com.cliplink.sender.data.DeviceStore
 import com.cliplink.sender.discovery.NsdScanner
+import com.cliplink.sender.discovery.SubnetScanner
 import com.cliplink.sender.service.ClipboardRelayService
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.thread
 
 class MainActivity : ComponentActivity() {
@@ -35,7 +37,13 @@ class MainActivity : ComponentActivity() {
     private lateinit var stopServiceButton: Button
 
     private lateinit var deviceStore: DeviceStore
-    private lateinit var scanner: NsdScanner
+    private lateinit var nsdScanner: NsdScanner
+    private val subnetScanner = SubnetScanner()
+
+    // Unified device map — both mDNS and subnet scan write here.
+    private val nsdSeen    = ConcurrentHashMap<String, DeviceInfo>()
+    private val subnetSeen = ConcurrentHashMap<String, DeviceInfo>()
+
     private lateinit var adapter: DeviceAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,17 +51,17 @@ class MainActivity : ComponentActivity() {
         setContentView(R.layout.activity_main)
 
         selectedDeviceText = findViewById(R.id.selectedDeviceText)
-        scanButton = findViewById(R.id.scanButton)
-        stopScanButton = findViewById(R.id.refreshButton)
-        manualNameInput = findViewById(R.id.manualNameInput)
-        manualTargetInput = findViewById(R.id.manualTargetInput)
-        saveManualButton = findViewById(R.id.saveManualButton)
-        pingButton = findViewById(R.id.pingButton)
+        scanButton         = findViewById(R.id.scanButton)
+        stopScanButton     = findViewById(R.id.refreshButton)
+        manualNameInput    = findViewById(R.id.manualNameInput)
+        manualTargetInput  = findViewById(R.id.manualTargetInput)
+        saveManualButton   = findViewById(R.id.saveManualButton)
+        pingButton         = findViewById(R.id.pingButton)
         startServiceButton = findViewById(R.id.startServiceButton)
-        stopServiceButton = findViewById(R.id.stopServiceButton)
+        stopServiceButton  = findViewById(R.id.stopServiceButton)
 
         deviceStore = DeviceStore(this)
-        scanner = NsdScanner(this)
+        nsdScanner  = NsdScanner(this)
 
         adapter = DeviceAdapter(::onDeviceSelected)
         findViewById<RecyclerView>(R.id.devicesRecyclerView).apply {
@@ -72,21 +80,17 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        scanner.stop()
+        nsdScanner.stop()
         super.onDestroy()
     }
 
     private fun bindActions() {
-        scanButton.setOnClickListener {
-            scanner.start(
-                onUpdate = { devices -> runOnUiThread { adapter.submitList(devices) } },
-                onError = { msg -> runOnUiThread { toast(msg) } }
-            )
-            toast("正在搜索局域网设备…")
-        }
+        scanButton.setOnClickListener { startScan() }
 
         stopScanButton.setOnClickListener {
-            scanner.stop()
+            nsdScanner.stop()
+            nsdSeen.clear()
+            subnetSeen.clear()
             adapter.submitList(emptyList())
             toast("已停止搜索")
         }
@@ -104,7 +108,6 @@ class MainActivity : ComponentActivity() {
                 toast("请输入正确的 IP:端口")
                 return@setOnClickListener
             }
-
             val customName = manualNameInput.text?.toString()?.trim().orEmpty()
             val device = DeviceInfo(
                 name = if (customName.isBlank()) "Manual $host" else customName,
@@ -122,8 +125,7 @@ class MainActivity : ComponentActivity() {
                 toast("请先选择一个接收设备")
                 return@setOnClickListener
             }
-            val intent = Intent(this, ClipboardRelayService::class.java)
-            ContextCompat.startForegroundService(this, intent)
+            ContextCompat.startForegroundService(this, Intent(this, ClipboardRelayService::class.java))
             toast("后台自动同步已启动")
         }
 
@@ -133,13 +135,51 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Starts mDNS immediately and launches the subnet scan 1 second later
+    // (same strategy as LocalSend: give multicast a chance first).
+    private fun startScan() {
+        nsdSeen.clear()
+        subnetSeen.clear()
+        adapter.submitList(emptyList())
+
+        // mDNS — works when router allows multicast
+        nsdScanner.start(
+            onUpdate = { devices ->
+                nsdSeen.clear()
+                devices.forEach { nsdSeen[it.stableKey] = it }
+                refreshAdapter()
+            },
+            onError = { /* mDNS failure is non-fatal; subnet scan is the reliable path */ }
+        )
+
+        // Subnet scan — starts 1 s later, works on any network where HTTP is reachable.
+        // 50 parallel probes × ~1 s timeout = ~6 s to scan a full /24.
+        toast("正在搜索局域网设备（最多约 6 秒）…")
+        thread(isDaemon = true) {
+            Thread.sleep(1000)
+            subnetScanner.scan(
+                onFound = { device ->
+                    subnetSeen[device.stableKey] = device
+                    refreshAdapter()
+                },
+                onDone = { /* scan finished — nothing extra needed */ }
+            )
+        }
+    }
+
+    private fun refreshAdapter() {
+        val merged = (nsdSeen.values + subnetSeen.values)
+            .distinctBy { it.stableKey }
+            .sortedBy { it.name }
+        runOnUiThread { adapter.submitList(merged) }
+    }
+
     private fun onDeviceSelected(device: DeviceInfo) {
         deviceStore.save(device)
         renderSelected(device)
         manualNameInput.setText(device.name)
         manualTargetInput.setText("${device.host}:${device.port}")
-        val intent = Intent(this, ClipboardRelayService::class.java)
-        ContextCompat.startForegroundService(this, intent)
+        ContextCompat.startForegroundService(this, Intent(this, ClipboardRelayService::class.java))
         toast("已选择并启动后台同步: ${device.name}")
     }
 
@@ -151,12 +191,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
-        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
-    }
-
     private fun pingCurrentDevice() {
         val device = deviceStore.load()
         if (device == null) {
@@ -165,13 +199,12 @@ class MainActivity : ComponentActivity() {
         }
         toast("正在测试连接 ${device.host}:${device.port}…")
         thread(isDaemon = true) {
-            val url = "http://${device.host}:${device.port}/healthz"
             val result = StringBuilder()
             result.appendLine("目标: ${device.name}")
             result.appendLine("地址: ${device.host}:${device.port}")
             result.appendLine()
             try {
-                val conn = URL(url).openConnection() as HttpURLConnection
+                val conn = URL("http://${device.host}:${device.port}/healthz").openConnection() as HttpURLConnection
                 conn.connectTimeout = 3000
                 conn.readTimeout = 3000
                 val t0 = System.currentTimeMillis()
@@ -223,6 +256,12 @@ class MainActivity : ComponentActivity() {
                     .show()
             }
         }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
+        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
     }
 
     private fun toast(msg: String) {
