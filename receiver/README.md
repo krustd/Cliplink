@@ -21,6 +21,21 @@ go build -o cliplinkd ./cmd/cliplinkd
 ./cliplinkd
 ```
 
+### 查看版本信息
+
+```bash
+cd receiver
+go run ./cmd/cliplinkd --version
+```
+
+---
+
+## 发布包
+
+- 推送 `receiver-v*` tag 后，GitHub Actions 会自动发布跨平台构建产物
+- 产物包含 Windows `.zip`、macOS `.tar.gz`，以及 Linux `deb`、`rpm`、`apk`、`archlinux` 包
+- 如只想本地生成单个可执行文件，继续使用 `go build ./cmd/cliplinkd` 即可
+
 ---
 
 ## 配置（环境变量）

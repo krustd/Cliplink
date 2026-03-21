@@ -26,11 +26,11 @@ go run ./cmd/cliplinkd
 
 **2. 安装 Android App**
 
-用 Android Studio 打开 `android-sender/`，编译安装到手机。
+可直接从 GitHub Releases 下载 Android APK，或用 Android Studio 打开 `android-sender/` 自行编译安装。
 
 **3. 连接**
 
-打开 App → 点「搜索设备」→ 选中电脑 → 完成。
+打开 App 后会自动搜索附近接收端，点选电脑即可完成连接。
 
 ## 发送方式
 
@@ -53,3 +53,8 @@ go run ./cmd/cliplinkd
 - Android 8.0+（minSdk 26）
 - 桌面端：Go 1.21+，macOS / Windows / Linux
 - 手机与电脑需在同一 WiFi 下
+
+## 发布
+
+- Android 发送端：推送 tag `android-sender-v*` 后，GitHub Actions 会自动构建已签名的 release APK 并附加到 GitHub Release
+- Receiver 桌面端：推送 tag `receiver-v*` 后，GitHub Actions 会自动发布 Windows 压缩包、macOS 压缩包以及 Linux `deb`、`rpm`、`apk`、`archlinux` 包

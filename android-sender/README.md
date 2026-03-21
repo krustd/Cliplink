@@ -83,17 +83,23 @@ cd android-sender
 - targetSdk: 35
 - 编译工具链：AGP 8.5.2 / Kotlin 1.9.24 / Gradle 8.7
 
+## 发布
+
+- 推送 `android-sender-v*` tag 后，GitHub Actions 会自动构建并上传 signed release APK
+- 仓库已配置 release keystore secrets，后续正式版本会沿用同一把签名密钥，保证用户可直接覆盖升级
+- 本地如需手动打正式包，可在 `android-sender/` 目录执行 `./gradlew assembleRelease`
+
 ---
 
 ## 使用流程
 
 1. 在电脑上启动 `cliplinkd`（见 `receiver/` 目录）
-2. 打开 App → 点「搜索设备」
-3. 从列表中点选目标设备（或手动输入 IP:端口 → 保存）
-4. 看到「当前设备: xxx」说明选中成功
-5. 此后用通知栏按钮、App 内按钮或分享菜单发送内容
+2. 打开 App，等待自动搜索附近设备
+3. 从列表中点选目标设备，或手动输入 IP:端口 后保存
+4. 看到当前接收端信息并显示在线状态后即可发送
+5. 此后可用通知栏按钮、App 内按钮或分享菜单发送内容
 
-连接有问题时，点「🔍 连接测试」可诊断网络是否通畅。
+发送前 App 会先检查接收端是否在线；连接有问题时，也可以点「检查在线」查看状态。
 
 ---
 
