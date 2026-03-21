@@ -74,6 +74,13 @@
         android:layout_marginTop="8dp"
         android:text="手动保存并使用" />
 
+    <Button
+        android:id="@+id/pingButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="🔍 连接测试" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/devicesRecyclerView"
         android:layout_width="match_parent"
