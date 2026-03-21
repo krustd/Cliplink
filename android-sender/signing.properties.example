@@ -1,0 +1,4 @@
+ANDROID_SIGNING_STORE_FILE=/absolute/path/to/cliplink-android-release.keystore
+ANDROID_KEYSTORE_PASSWORD=replace-me
+ANDROID_KEY_ALIAS=cliplink-release
+ANDROID_KEY_PASSWORD=replace-me

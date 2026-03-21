@@ -1,2 +1,5 @@
 .claude/
 .DS_Store
+android-sender/signing.properties
+android-sender/*.jks
+android-sender/*.keystore
