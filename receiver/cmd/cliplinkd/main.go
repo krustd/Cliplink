@@ -27,6 +27,17 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
+	stopUDP, err := discovery.StartUDPDiscovery(discovery.UDPInfo{
+		Name: cfg.DeviceName,
+		Port: cfg.Port,
+		OS:   cfg.DeviceOS,
+	})
+	if err != nil {
+		log.Printf("warning: UDP broadcast discovery unavailable: %v", err)
+	} else {
+		defer stopUDP()
+	}
+
 	service, err := discovery.StartMDNS(discovery.Options{
 		ServiceName: cfg.MDNSServiceName,
 		ServiceType: cfg.MDNSServiceType,
