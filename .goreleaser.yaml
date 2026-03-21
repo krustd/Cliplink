@@ -2,10 +2,6 @@ version: 2
 
 project_name: cliplinkd
 
-before:
-  hooks:
-    - go mod download
-
 builds:
   - id: cliplinkd
     binary: cliplinkd
