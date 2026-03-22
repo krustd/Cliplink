@@ -1,0 +1,10 @@
+<resources>
+    <dimen name="screen_content_padding">24dp</dimen>
+    <dimen name="section_gap">16dp</dimen>
+    <dimen name="card_padding">20dp</dimen>
+    <dimen name="hero_padding">24dp</dimen>
+    <dimen name="action_button_height">52dp</dimen>
+    <dimen name="send_button_height">58dp</dimen>
+    <dimen name="panel_gap">20dp</dimen>
+    <dimen name="details_panel_width">400dp</dimen>
+</resources>

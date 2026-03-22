@@ -45,7 +45,7 @@ object RomCompat {
         return when (Build.MANUFACTURER.lowercase().trim()) {
             "xiaomi", "redmi", "poco" -> Guide(
                 title = "小米设备需要额外授权",
-                message = "在 MIUI / HyperOS 上，通知栏的【发送剪贴板】按钮需要以下两项权限：\n\n" +
+                message = "在 MIUI / HyperOS 上，通知栏的【发送当前内容】按钮需要以下两项权限：\n\n" +
                         "1. 自启动\n2. 后台弹出界面\n\n" +
                         "路径：安全中心 -> 授权管理 -> 自启动管理 -> 找到 ClipLink 开启\n\n" +
                         "同时：设置 -> 应用 -> ClipLink -> 权限 -> 后台弹出界面 -> 允许",

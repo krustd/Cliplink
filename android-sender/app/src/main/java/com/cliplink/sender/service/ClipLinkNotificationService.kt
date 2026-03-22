@@ -27,7 +27,7 @@ class ClipLinkNotificationService : Service() {
 
     private fun buildNotification(): Notification {
         val device = DeviceStore(this).load()
-        val subtitle = if (device == null) "未选择目标设备" else "发送到: ${device.name}"
+        val subtitle = if (device == null) "未选择接收端" else "当前接收端：${device.name}"
 
         val openAppIntent = PendingIntent.getActivity(
             this, 0,
@@ -48,7 +48,7 @@ class ClipLinkNotificationService : Service() {
             .setContentTitle("ClipLink")
             .setContentText(subtitle)
             .setContentIntent(openAppIntent)
-            .addAction(R.drawable.ic_send_action, "📋 发送剪贴板", sendClipIntent)
+            .addAction(R.drawable.ic_send_action, "发送当前内容", sendClipIntent)
             .setOngoing(true)
             .build()
     }

@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/pageBackground"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:padding="@dimen/screen_content_padding">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_hero_panel"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="@dimen/hero_padding">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/titleText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="ClipLink"
+                android:textColor="@android:color/white"
+                android:textSize="30sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/subtitleText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="自动发现接收端，选中后就能把手机文本快速投到电脑剪贴板。"
+                android:textColor="#D9E8FF"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/scanStatusText"
+            android:layout_width="320dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:background="@drawable/bg_status_pill"
+            android:gravity="center"
+            android:paddingStart="14dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="10dp"
+            android:textColor="@color/colorPrimaryDark"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="@dimen/section_gap"
+        android:layout_weight="1"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_section_card"
+            android:orientation="vertical"
+            android:padding="@dimen/card_padding">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="附近设备"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/refreshButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="@dimen/action_button_height"
+                    android:text="刷新设备" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/emptyDevicesText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:gravity="center"
+                android:text="正在自动搜索设备…"
+                android:textColor="@color/textSecondary"
+                android:textSize="14sp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/devicesRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="12dp"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:paddingBottom="6dp" />
+        </LinearLayout>
+
+        <ScrollView
+            android:layout_width="@dimen/details_panel_width"
+            android:layout_height="match_parent"
+            android:layout_marginStart="@dimen/panel_gap"
+            android:clipToPadding="false"
+            android:fillViewport="true"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_selected_device"
+                    android:orientation="vertical"
+                    android:padding="@dimen/card_padding">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="当前接收端"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/selectedDeviceText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="还没有选择接收端"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/selectedDeviceMetaText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/selectedDeviceStatusText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_status_pill"
+                        android:paddingStart="12dp"
+                        android:paddingTop="6dp"
+                        android:paddingEnd="12dp"
+                        android:paddingBottom="6dp"
+                        android:text="等待状态更新"
+                        android:textColor="@color/colorPrimaryDark"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/pingButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/action_button_height"
+                        android:layout_marginTop="14dp"
+                        android:text="检测连接" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/section_gap"
+                    android:background="@drawable/bg_section_card"
+                    android:orientation="vertical"
+                    android:padding="@dimen/card_padding">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="手动连接"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <EditText
+                        android:id="@+id/manualNameInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="@android:drawable/edit_text"
+                        android:hint="设备名称，可留空"
+                        android:inputType="textCapWords"
+                        android:padding="12dp" />
+
+                    <EditText
+                        android:id="@+id/manualTargetInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="@android:drawable/edit_text"
+                        android:hint="输入 IP:端口，例如 192.168.1.8:43837"
+                        android:inputType="textUri"
+                        android:padding="12dp" />
+
+                    <Button
+                        android:id="@+id/saveManualButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/action_button_height"
+                        android:layout_marginTop="10dp"
+                        android:text="保存接收端" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/sendClipboardButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/send_button_height"
+                    android:layout_marginTop="@dimen/section_gap"
+                    android:text="发送当前内容"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/sendStatusText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_section_card"
+                    android:minHeight="96dp"
+                    android:padding="14dp"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+
+</LinearLayout>

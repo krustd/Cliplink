@@ -12,7 +12,7 @@ import com.cliplink.sender.service.SenderClient
 import kotlin.concurrent.thread
 
 /**
- * Dialog-style activity launched from the notification "发送剪贴板" button.
+ * Dialog-style activity launched from the notification action button.
  *
  * A dialog with actual visible content reliably receives window focus on all
  * devices including Huawei EMUI. We read the clipboard only after focus is
@@ -39,7 +39,7 @@ class ClipSendActivity : ComponentActivity() {
     private fun readAndSend() {
         val device = DeviceStore(this).load()
         if (device == null) {
-            toast("请先在 ClipLink 中选择目标设备")
+            toast("请先在 ClipLink 中选择接收端")
             finish()
             return
         }
@@ -64,7 +64,7 @@ class ClipSendActivity : ComponentActivity() {
             val health = SenderClient.checkHealth(device)
             if (!health.ok) {
                 runOnUiThread {
-                    toast("接收端不在线: ${health.message}")
+                    toast("接收端暂不可用：${health.message}")
                     finish()
                 }
                 return@thread
@@ -72,9 +72,9 @@ class ClipSendActivity : ComponentActivity() {
             val result = SenderClient.pushText(device, text)
             runOnUiThread {
                 if (result.isSuccess) {
-                    toast("✅ 已发送到 ${device.name}")
+                    toast("已发送到 ${device.name}")
                 } else {
-                    toast("❌ 发送失败: ${result.exceptionOrNull()?.message}")
+                    toast("发送失败：${result.exceptionOrNull()?.message ?: "未知错误"}")
                 }
                 finish()
             }

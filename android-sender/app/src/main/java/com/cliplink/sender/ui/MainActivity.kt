@@ -174,14 +174,14 @@ class MainActivity : ComponentActivity() {
         }
 
         sendClipboardButton.isEnabled = false
-        sendStatusText.text = "发送前检查接收端状态…"
+        sendStatusText.text = "正在检测接收端状态…"
         thread(isDaemon = true) {
             val health = SenderClient.checkHealth(device)
             if (!health.ok) {
                 runOnUiThread {
                     sendClipboardButton.isEnabled = true
                     applyHealthResult(device, health)
-                    sendStatusText.text = "发送已取消：${health.message}"
+                    sendStatusText.text = "发送未开始：${health.message}"
                     showOfflineDialog(device, health.message)
                 }
                 return@thread
@@ -189,7 +189,7 @@ class MainActivity : ComponentActivity() {
 
             runOnUiThread {
                 applyHealthResult(device, health)
-                sendStatusText.text = "正在发送剪贴板到 ${device.name}…"
+                sendStatusText.text = "正在发送到 ${device.name}…"
             }
 
             val result = SenderClient.pushText(device, text)
@@ -212,7 +212,7 @@ class MainActivity : ComponentActivity() {
         subnetSeen.clear()
         adapter.submitList(emptyList())
         renderDevices(emptyList())
-        scanStatusText.text = if (userInitiated) "正在重新搜索附近设备…" else "正在自动搜索附近设备…"
+        scanStatusText.text = if (userInitiated) "正在刷新设备列表…" else "正在搜索接收端…"
 
         nsdScanner.start(
             onUpdate = { devices ->
@@ -232,7 +232,7 @@ class MainActivity : ComponentActivity() {
             subnetScanner.scan(
                 onStart = { subnet ->
                     if (sessionId != scanSession.get()) return@scan
-                    runOnUiThread { scanStatusText.text = "正在扫描 $subnet.1-254 网段…" }
+                    runOnUiThread { scanStatusText.text = "正在扫描 $subnet.1-254…" }
                 },
                 onFound = { device ->
                     if (sessionId != scanSession.get()) return@scan
@@ -243,7 +243,7 @@ class MainActivity : ComponentActivity() {
                     if (sessionId != scanSession.get()) return@scan
                     if (done % 30 == 0 || done == 254) {
                         runOnUiThread {
-                            scanStatusText.text = "子网扫描 $done/254，已发现 $found 台设备"
+                            scanStatusText.text = "已扫描 $done/254，发现 $found 台接收端"
                         }
                     }
                 },
@@ -254,9 +254,9 @@ class MainActivity : ComponentActivity() {
                         .size
                     runOnUiThread {
                         scanStatusText.text = if (total == 0)
-                            "没有找到设备，可以手动输入 IP:端口 直接连接"
+                            "暂未发现接收端，可手动输入 IP:端口"
                         else
-                            "已发现 $total 台设备，点一下就能切换"
+                            "已发现 $total 台接收端"
                     }
                 }
             )
@@ -272,7 +272,7 @@ class MainActivity : ComponentActivity() {
             if (current != null) {
                 val rediscovered = merged.firstOrNull { it.endpointKey == current.endpointKey }
                 if (rediscovered == null) {
-                    clearSelectedDevice("原先选择的设备已不在当前在线列表中")
+                    clearSelectedDevice("当前接收端已不在在线列表中，请重新选择")
                 } else {
                     if (rediscovered != current) {
                         onDeviceSelected(rediscovered, showToast = false)
@@ -287,7 +287,7 @@ class MainActivity : ComponentActivity() {
         adapter.selectedEndpoint = deviceStore.load()?.endpointKey
         adapter.submitList(devices)
         emptyDevicesText.text = if (devices.isEmpty()) {
-            "正在自动搜索设备…\n如果电脑端已启动，通常几秒内就会出现。"
+            "正在搜索接收端…\n确认电脑端已启动后，通常会在几秒内出现。"
         } else {
             ""
         }
@@ -301,7 +301,7 @@ class MainActivity : ComponentActivity() {
         manualTargetInput.setText("${device.host}:${device.port}")
         adapter.selectedEndpoint = device.endpointKey
         if (showToast) {
-            toast("已切换到 ${device.name}")
+            toast("已选中 ${device.name}")
         }
         startNotificationService()
         refreshSelectedDeviceHealth(showToastOnFailure = false)
@@ -309,16 +309,16 @@ class MainActivity : ComponentActivity() {
 
     private fun renderSelected(device: DeviceInfo?) {
         selectedDeviceText.text = if (device == null) {
-            "还没有选择接收端"
+            "尚未选择接收端"
         } else {
             device.name
         }
         selectedDeviceMetaText.text = if (device == null) {
-            "打开后会自动搜索附近设备，也可以手动输入地址"
+            "系统会自动搜索局域网内的接收端，也可手动输入地址"
         } else {
             "${device.host}:${device.port} · ${device.os ?: "unknown-os"}"
         }
-        selectedDeviceStatusText.text = if (device == null) "尚未选择设备" else "等待检查在线状态"
+        selectedDeviceStatusText.text = if (device == null) "尚未选择接收端" else "等待状态更新"
     }
 
     private fun pingCurrentDevice() {
@@ -327,14 +327,14 @@ class MainActivity : ComponentActivity() {
             toast("请先选择或手动保存一个设备")
             return
         }
-        selectedDeviceStatusText.text = "正在检查在线状态…"
+        selectedDeviceStatusText.text = "正在检测连接状态…"
         thread(isDaemon = true) {
             val result = SenderClient.checkHealth(device)
 
             runOnUiThread {
                 applyHealthResult(device, result)
                 AlertDialog.Builder(this)
-                    .setTitle(if (result.ok) "接收端在线" else "接收端暂不可用")
+                    .setTitle(if (result.ok) "连接正常" else "连接不可用")
                     .setMessage(buildHealthMessage(device, result))
                     .setPositiveButton("确定", null)
                     .show()
@@ -344,7 +344,7 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshSelectedDeviceHealth(showToastOnFailure: Boolean) {
         val device = deviceStore.load() ?: return
-        selectedDeviceStatusText.text = "正在检查在线状态…"
+        selectedDeviceStatusText.text = "正在检测连接状态…"
         thread(isDaemon = true) {
             val result = SenderClient.checkHealth(device)
             runOnUiThread {
@@ -367,7 +367,7 @@ class MainActivity : ComponentActivity() {
         selectedDeviceStatusText.text = if (result.ok) {
             "在线$suffix"
         } else {
-            "离线 · ${result.message}"
+            "不可用 · ${result.message}"
         }
         if (deviceStore.load()?.endpointKey == device.endpointKey) {
             selectedDeviceMetaText.text = "${device.host}:${device.port} · ${device.os ?: "unknown-os"}"
@@ -383,7 +383,7 @@ class MainActivity : ComponentActivity() {
 
     private fun buildHealthMessage(device: DeviceInfo, result: SenderClient.HealthCheckResult): String {
         return buildString {
-            appendLine("目标设备：${device.name}")
+            appendLine("接收端：${device.name}")
             appendLine("地址：${device.host}:${device.port}")
             appendLine()
             appendLine(result.message)
@@ -391,7 +391,7 @@ class MainActivity : ComponentActivity() {
             result.latencyMs?.let { appendLine("延迟：${it}ms") }
             if (!result.ok) {
                 appendLine()
-                append("建议：确认电脑端 cliplinkd 已运行，并检查手机与电脑是否在同一网络")
+                append("建议：确认电脑端接收端已启动，并检查手机与电脑是否在同一网络")
             }
         }.trimEnd()
     }
@@ -399,7 +399,7 @@ class MainActivity : ComponentActivity() {
     private fun showOfflineDialog(device: DeviceInfo, reason: String) {
         AlertDialog.Builder(this)
             .setTitle("暂时无法发送")
-            .setMessage("接收端 ${device.name} 当前不在线。\n\n$reason")
+            .setMessage("接收端 ${device.name} 当前不可用。\n\n$reason")
             .setPositiveButton("知道了", null)
             .show()
     }
