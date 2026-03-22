@@ -26,12 +26,9 @@ ClipLink App                    cliplinkd
 
 ### 1. 启动电脑端接收服务
 
-```bash
-cd receiver
-go run ./cmd/cliplinkd
-```
-
-默认监听 `:43837`，并通过 mDNS 和广播向局域网内的手机提供发现能力。
+- 从 GitHub Releases 下载适合你系统的 receiver 产物
+- 解压后直接运行 `cliplinkd`
+- 默认监听 `:43837`，并通过 mDNS 和广播向局域网内的手机提供发现能力
 
 ### 2. 安装 Android App
 
@@ -81,6 +78,15 @@ go run ./cmd/cliplinkd
 
 - `android-sender/README.md`
 - `receiver/README.md`
+
+## 开发者运行
+
+如果你是要本地开发或调试，也可以直接从源码启动 receiver：
+
+```bash
+cd receiver
+go run ./cmd/cliplinkd
+```
 
 ## 发布
 
