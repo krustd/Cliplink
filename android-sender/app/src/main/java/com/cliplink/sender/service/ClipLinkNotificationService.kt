@@ -48,7 +48,7 @@ class ClipLinkNotificationService : Service() {
             .setContentTitle("ClipLink")
             .setContentText(subtitle)
             .setContentIntent(openAppIntent)
-            .addAction(0, "📋 发送剪贴板", sendClipIntent)
+            .addAction(R.drawable.ic_send_action, "📋 发送剪贴板", sendClipIntent)
             .setOngoing(true)
             .build()
     }

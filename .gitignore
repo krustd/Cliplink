@@ -3,3 +3,4 @@
 android-sender/signing.properties
 android-sender/*.jks
 android-sender/*.keystore
+harmonyos-sender
